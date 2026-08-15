@@ -1,4 +1,4 @@
-(asdf:defsystem "cl-tpg"
+(asdf:defsystem "bes"
   :description "A Common Lisp implementation of Tangled Program Graphs"
   :version "0.4"
   :author "Bryce MacInnis"

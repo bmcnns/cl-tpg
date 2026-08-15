@@ -1,4 +1,4 @@
-(in-package :cl-tpg)
+(in-package :bes)
 
 (defstruct program
   (instructions (make-array *init-program-size*

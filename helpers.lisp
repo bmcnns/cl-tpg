@@ -1,4 +1,4 @@
-(in-package :cl-tpg)
+(in-package :bes)
 
 (defun make-counter ()
   (let ((count 0))

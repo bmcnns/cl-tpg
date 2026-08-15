@@ -1,6 +1,6 @@
 					; program mutations
 
-(in-package :cl-tpg)
+(in-package :bes)
 
 (defun add-instruction-p ()
   "Returns T with *p-add* likelihood."

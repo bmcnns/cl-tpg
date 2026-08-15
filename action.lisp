@@ -1,4 +1,4 @@
-(in-package :cl-tpg)
+(in-package :bes)
 
 (defstruct action
   (type :atomic)

@@ -1,4 +1,4 @@
-(in-package :cl-tpg)
+(in-package :bes)
 
 (defun seed-or-random-seed (seed)
   "The start-search TCP packet will either contain :random or an integer seed.
