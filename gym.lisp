@@ -1,4 +1,4 @@
-(in-package :cl-gym)
+(in-package :bes-gym)
 
 (defun obs->array (obs)
   "Coerces an observation OBS from list to simple double-float array.

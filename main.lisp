@@ -25,7 +25,7 @@
     (gym-environment-name
      (setf *fitness-fn*
 	   (lambda (team)
-	     (cl-gym:rollout team gym-environment-name (random 9999999)))))
+	     (bes-gym:rollout team gym-environment-name (random 9999999)))))
     (dataset-name
      (let ((dataset (load-dataset dataset-name)))
        (setf *fitness-fn* 
