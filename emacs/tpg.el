@@ -18,7 +18,8 @@
     ("10.100.202.56" . 12) ;; ds-cmlm-16
     ("10.100.202.57" . 13) ;; ds-cmlm-17
     ("10.100.202.58" . 14) ;; ds-cmlm-18
-    ("10.100.202.59" . 15)) ;; ds-cmlm-19
+    ("10.100.202.59" . 15) ;; ds-cmlm-19
+    ("129.173.242.196" . 16))
   "The mapping between IP address and their island ID.")
 
 (defun plist-to-cl-sexp (plist)
@@ -139,7 +140,7 @@
   (let* ((args (transient-args 'start-search-menu))
          (island-arg (transient-arg-value "--island=" args))
          (island-ids (if (string= island-arg "all")
-                         '(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15)
+                         '(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16)
                          (list (string-to-number island-arg))))
          (ip-addresses (mapcar #'lookup-ip-by-island-id island-ids))
          (payload (make-payload-from-transient-args args)))
@@ -167,7 +168,7 @@
   (let* ((args (transient-args 'stop-search-menu))
          (island-arg (transient-arg-value "--island=" args))
          (island-ids (if (string= island-arg "all")
-                         '(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15)
+                         '(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16)
                        (list (string-to-number island-arg))))
          (payload '(:type :stop-search)))
     (cl-loop for id in island-ids
@@ -188,7 +189,7 @@
   "Menu for stopping searches."
   ["Island"
    ("-I" "Island" "--island="
-    :choices ("all" "0" "1" "2" "3" "4" "5" "6" "7" "8" "9" "10" "11" "12" "13" "14" "15"))]
+    :choices ("all" "0" "1" "2" "3" "4" "5" "6" "7" "8" "9" "10" "11" "12" "13" "14" "15" "16"))]
   ["Actions"
    ("D" "STOP Search" stop-search)
    ("q" "Back to Main" tpg-menu)])
@@ -220,12 +221,12 @@
 	   "*seed=random")
   ["Island"
     ("-I" "Island" "--island="
-    :choices ("all" "0" "1" "2" "3" "4" "5" "6" "7" "8" "9" "10" "11" "12" "13" "14" "15"))]
+    :choices ("all" "0" "1" "2" "3" "4" "5" "6" "7" "8" "9" "10" "11" "12" "13" "14" "15" "16"))]
   ["Evaluation"
    ("-M" "Evaluation Mode" "--mode="
     :choices ("online" "offline"))
    ("-G" "Gymnasium Environment Name" "*env="
-    :choices ("none" "Hopper-v5" "Walker2d-v5" "HalfCheetah-v5" "Acrobot-v1" "LunarLander-v3" "MountainCar-v0" "CartPole-v1"))
+    :choices ("none" "Hopper-v5" "Walker2d-v5" "HalfCheetah-v5" "Acrobot-v1" "LunarLander-v3" "MountainCar-v0" "CartPole-v1" "FrozenLake-v1"))
    ("-F" "Dataset Name" "*dataset=")]
   ["Key Settings"
    ("-Z" "Number of Observations" "*num-observations=")

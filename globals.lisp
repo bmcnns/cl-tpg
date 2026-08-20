@@ -1,6 +1,6 @@
 (in-package :bes)
 
-(defparameter *num-threads* 140
+(defparameter *num-threads* 1
   "The number of CPU cores available for multi-threading.")
 
 (defconstant +num-registers+ 8
@@ -16,28 +16,28 @@
 (defvar *generation* 1
   "Generation counter.")
 
-(defparameter *population-size* 
+(defparameter *population-size* 100
   "The number of candidate solutions at any given time.")
 
-(defparameter *num-observations* 
+(defparameter *num-observations* 16
   "The number of possible observations.")
 
-(defparameter *num-actions* 
+(defparameter *num-actions* 4
   "The number of possible actions.")
 
-(defparameter *init-num-learners* 
+(defparameter *init-num-learners* 2
   "The number of learners that a team is initialized with.
    Recommended: ceil(num-actions/2).")
 
-(defparameter *max-num-learners* 
+(defparameter *max-num-learners* :inf
   "The maximum number of learners that a team may have.
    Recommended: num-actions.")
 
-(defparameter *p-add* 
+(defparameter *p-add* 0.5
   "The probability that a new learner is added to a team during mutation.
    Recommended value: 0.2")
 
-(defparameter *p-del* 
+(defparameter *p-del* 0.5
   "The probability that a learner is removed from a team during mutation.
    Recommended value: 0.1")
 

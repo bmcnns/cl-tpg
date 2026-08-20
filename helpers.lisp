@@ -22,6 +22,28 @@
       t
       nil))
 
+(defun get-cpu-usage-macos ()
+  "Returns the current overall CPU usage percentage on macOS."
+  (let* ((process (sb-ext:run-program "/usr/bin/top"
+                                      '("-l" "1" "-n" "0")
+                                      :output :stream
+                                      :search nil))
+         (stream (sb-ext:process-output process)))
+    (unwind-protect
+        (loop for line = (read-line stream nil nil)
+              while line
+              ;; Line format: "CPU usage: 4.12% user, 8.24% sys, 87.64% idle"
+              when (search "CPU usage:" line)
+                return (let* ((idle-pos (search "% idle" line))
+                              (start (when idle-pos
+                                       (1+ (position #\, line :end idle-pos :from-end t))))
+                              (idle-val (when start
+                                          (read-from-string (subseq line start idle-pos)))))
+                         (if (numberp idle-val)
+                             (- 100.0 idle-val)
+                             0.0)))
+      (sb-ext:process-close process))))
+
 (defun get-cpu-usage (&optional (interval 1))
   "Returns a single float representing the total CPU utilization (0.0 to 100.0)."
   (flet ((get-raw-cpu ()
@@ -59,3 +81,18 @@
 	  (let ((used (- total (+ free buffers cached))))
 	    (* 100.0 (/ used (float total))))
 	  0.0))))
+
+(defun get-memory-usage-macos ()
+  "Returns the sum of %MEM across all running processes."
+  (let* ((output (uiop:run-program '("ps" "-A" "-o" "%mem") :output :string))
+         (lines (rest (uiop:split-string output :separator '(#\Newline)))))
+    (reduce #'+ (mapcar (lambda (s) (or (read-from-string s nil) 0.0))
+                        (remove "" lines :test #'string=)))))
+
+(defmacro across-many-trials (num-trials &body body)
+  `(progn
+     (setf *trial* 1)
+     (loop repeat ,num-trials
+	   do ,@body
+	      (incf *trial*)
+	   )))

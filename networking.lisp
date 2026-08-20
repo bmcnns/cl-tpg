@@ -9,7 +9,7 @@
 (defvar *server-running* nil
   "When NIL, server loops will exit.")
 
-(defparameter *telemetry-ip* "129.173.22.24"
+(defparameter *telemetry-ip* "0.0.0.0"
   "IP address of the emacs client receiving telemetry.")
 
 (defparameter *heartbeat-interval* 300
@@ -31,7 +31,8 @@
     ("10.100.202.56" . 12) ;; ds-cmlm-16
     ("10.100.202.57" . 13) ;; ds-cmlm-17
     ("10.100.202.58" . 14) ;; ds-cmlm-18
-    ("10.100.202.59" . 15)) ;; ds-cmlm-19
+    ("10.100.202.59" . 15)
+    ("129.173.242.196" . 16)) ;; ds-cmlm-19
   "The mapping between IP address and their island ID.")
 
 (defparameter *topology*
@@ -49,7 +50,8 @@
     (12 . (2 7 11 13))
     (13 . (3 12 8 14))
     (14 . (4 9 13 15))
-    (15 . (5 10 11 14)))
+    (15 . (5 10 11 14))
+    (16 . ()))
   "This is a 3x5 toroidal grid. Each island has 4 adjacent neighbours wrapping around if necessary.")
 
 (defun notify-telemetry (msg)
@@ -78,8 +80,8 @@
 		  `(:type :heartbeat
 		    :from ,island-id
 		    :ts ,(get-universal-time)
-		    :cpu ,(get-cpu-usage)
-		    :memory ,(get-memory-usage)))))
+		    :cpu ,(get-cpu-usage-macos)
+		    :memory ,(get-memory-usage-macos)))))
     (notify-telemetry payload)))
 			  
 (defun get-local-ip ()
@@ -292,13 +294,11 @@
 		       (progn
 			 (emit-message (format nil "Search started on island ~A~%" (who-am-i)))
 			 ;; enable multi-threading
-			 (setf lparallel:*kernel* (make-kernel *num-threads*))
 			 (run-search mode gym-environment-name dataset-name seed))
 		     (error (c)
 		       (setf *running* nil)
 		       (emit-error (format nil "Search crashed: ~A" c))))
-		(setf *running* nil)
-		(lparallel:end-kernel)))
+		(setf *running* nil)))
 	    :name "search-thread")
 	   *server-threads*))
 	(emit-error "The search parameters provided are invalid."))))
