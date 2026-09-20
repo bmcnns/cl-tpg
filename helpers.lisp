@@ -96,3 +96,9 @@
 	   do ,@body
 	      (incf *trial*)
 	   )))
+
+(defun softmax (seq)
+  (let* ((max-val (apply #'max seq))
+	 (exp-vals (mapcar (lambda (x) (exp (- x max-val))) seq))
+	 (sum-exp (reduce #'+ exp-vals)))
+    (mapcar (lambda (x) (/ x sum-exp)) exp-vals)))

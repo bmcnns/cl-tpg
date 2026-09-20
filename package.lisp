@@ -25,15 +25,29 @@
 		     #:*p-swap-instrs*
 		     #:*p-mut-constant*
 		     #:*p-mut-constant-sign*
-		     #:*output-file*
+
+		     #:*fitness-file*
+		     #:*cdf-file*
+		     #:*state-visitation-file*
+		     #:*video-file*
+		     
 		     #:*trial*
 		     #:best-policy
-		     #:across-many-trials))
+		     #:across-many-trials
+		     #:*stochastic*
+		     #:entropy
+		     #:*entropy-regularized*
+		     #:*beta*
+		     #:*monte-carlo-rollouts*
+
+		     #:init-success-accumulator
+		     #:write-success-curve
+		     #:*max-depth*))
 
 (defpackage :bes-gym
   (:use :cl :bes)
   (:shadow #:step)
-  (:export #:rollout)
+  (:export #:rollout #:entropy-regularized-rollout)
   (:documentation "A Gymnasium wrapper for BES"))
 
 (in-package :bes)

@@ -1,7 +1,14 @@
 (in-package :bes)
 
 (defvar *trial* 1)
-(defvar *output-file*)
+(defvar *fitness-file*)
+(defvar *cdf-file*)
+(defvar *state-visitation-file*)
+(defvar *video-file*)
+
+(defvar *stochastic*)
+(defvar *entropy-regularized*)
+(defvar *monte-carlo-rollouts*)
 
 (defun seed-or-random-seed (seed)
   "The start-search TCP packet will either contain :random or an integer seed.
@@ -33,43 +40,27 @@
                  ;; Generate a new set of seeds only when *generation* advances
                  (unless (eql current-gen *generation*)
                    (setf current-gen *generation*
-                         current-gen-seeds (loop repeat 1 collect (random 9999999))))
+                         current-gen-seeds (loop repeat *monte-carlo-rollouts* collect (random 9999999))))
                  (/ (reduce #'+
                             (loop for seed in current-gen-seeds
-                                  collect (apply #'bes-gym:rollout 
-                                                 team 
-                                                 gym-environment-name 
-                                                 seed 
-                                                 filtered-kwargs)))
+				  if (and *stochastic* *entropy-regularized*)
+				    collect (apply #'bes-gym:entropy-regularized-rollout
+						   team
+						   gym-environment-name
+						   seed
+						   filtered-kwargs)
+				  else
+				    collect (apply #'bes-gym:rollout 
+						   team 
+						   gym-environment-name 
+						   seed 
+						   filtered-kwargs)))
                     (length current-gen-seeds))))))
       (dataset-name
        (let ((dataset (load-dataset dataset-name)))
          (setf *fitness-fn* 
                (lambda (team)
                  (accuracy team dataset))))))))
-
-(defun make-fitness-function (&rest kwargs &key gym-environment-name dataset-name &allow-other-keys)
-  (let ((filtered-kwargs (alexandria:remove-from-plist kwargs :gym-environment-name :dataset-name)))
-    (cond
-      (gym-environment-name
-       ;; 1. Generate the 25 seeds once so every team evaluates against the exact same seeds
-       (let ((seeds (loop repeat 25 collect (random 9999999))))
-         (setf *fitness-fn*
-               (lambda (team)
-                 (/ (reduce #'+
-                            (loop for seed in seeds
-                                  collect (apply #'bes-gym:rollout 
-                                                 team 
-                                                 gym-environment-name 
-                                                 seed 
-                                                 filtered-kwargs)))
-                    (length seeds))))))
-      
-      (dataset-name
-       (let ((dataset (load-dataset dataset-name)))
-         (setf *fitness-fn* 
-               (lambda (team)
-                 (accuracy team dataset))))))))  
 
 (defun safe-evaluate-team (team)
   (cons team
@@ -135,20 +126,39 @@
   (loop while (< (length (root-teams)) *population-size*)
 	do (mutate-team (clone-team (random-choice (root-teams))))))
 
+(defvar *gen-total-successes* nil)
+(defvar *gen-total-rollouts* nil)
+
+(defun init-success-accumulator (num-generations)
+  (setf *gen-total-successes* (make-array (1+ num-generations)
+				       :element-type 'double-float
+				       :initial-element 0.0d0))
+  (setf *gen-total-rollouts* (make-array (1+ num-generations)
+					 :element-type 'fixnum
+					 :initial-element 0)))
+
+
 (defun evolve ()
   "Evolve the population for a single generation."
  ; (receive-migrants)
 
-  (let ((evaluation-scores (evaluate))
-	(best-score (alexandria:extremum (evaluate) #'> :key #'cdr)))
+  (let* ((evaluation-scores (evaluate))
+	 (best-score (alexandria:extremum evaluation-scores #'> :key #'cdr))
+	 (successes
+	   (* (floor (/ (cdr best-score) 0.2d0))
+	      0.2d0
+	      *monte-carlo-rollouts*)))
 
-    (with-open-file (str *output-file*
+    (incf (aref *gen-total-successes* *generation*) successes)
+    (incf (aref *gen-total-rollouts* *generation*) *monte-carlo-rollouts*)
+    
+    (with-open-file (str *fitness-file*
 			 :direction :output
 			 :if-does-not-exist :create
 			 :if-exists :append)
       (when (zerop (file-length str))
-	(format str "TRIAL,GENERATION,FITNESS~%"))
-      (format str "~A,~A,~A~%" *trial* *generation* (cdr best-score))
+	(format str "TRIAL GENERATION FITNESS~%"))
+      (format str "~A ~A ~A~%" *trial* *generation* (cdr best-score))
       (format t "Trial ~5A Generation ~5A Fitness ~5A~%" *trial* *generation* (cdr best-score)))
 
     ;; (when (should-send-migrants-p)
@@ -157,6 +167,20 @@
     (select evaluation-scores)
     
     (reproduce)))
+
+(defun write-success-curve ()
+  "Writes the pooled empirical solve probability per generation."
+  (with-open-file (stream *cdf-file*
+			  :direction :output
+			  :if-exists :supersede
+			  :if-does-not-exist :create)
+    (format stream "GENERATION MEAN_SUCCESS_RATE~%")
+    (loop for g from 1 below (length *gen-total-rollouts*)
+	  for total-r = (aref *gen-total-rollouts* g)
+	  for total-s = (aref *gen-total-successes* g)
+	  for rate = (if (plusp total-r) (/ total-s total-r 1.0d0) 0.0d0)
+	  do (format stream "~D ~,9F~%" g rate))))
+    
 
 (defun run-search (mode gym-environment-name dataset-name seed generations &rest kwargs)
   "Search the solution space with a tangled program graph."
