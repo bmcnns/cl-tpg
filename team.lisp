@@ -59,6 +59,11 @@
     (setf (team-type target-team) :root)))
 
 (defun execute-team (team observation)
+  (if *stochastic*
+      (stochastic-execute-team team observation)
+      (deterministic-execute-team team observation)))
+
+(defun deterministic-execute-team (team observation)
   "Executes the TPG graph starting at TEAM.
    This follows the action of the learner with the highest bid."
   (let* ((learners (team-learners team))
@@ -68,6 +73,60 @@
       (if (eq (action-type act) :atomic)
 	  (action-action act)
 	  (execute-team (action-action act) observation)))))
+
+(defun stochastic-execute-team (team observation)
+  "Recursively executes the TPG graph starting at TEAM.
+   Marginalizes atomic action probabilities by weighting sub-team distributions
+   by their delegating learner's bid.
+   Returns two values:
+     1. The numeric action (action-action) sampled from the final distribution.
+     2. The list of sorted probabilities (distribution)."
+  (labels ((marginalize-team (current-team)
+             (let ((bid-alist '()))
+               (labels ((accumulate-bid (act weight)
+                          (let ((cell (assoc act bid-alist :test #'equalp)))
+                            (if cell
+                                (incf (cdr cell) weight)
+                                (push (cons act weight) bid-alist)))))
+                 
+                 ;; 1. Accumulate bids from learners
+                 (dolist (learner (team-learners current-team))
+                   (let* ((action (learner-action learner))
+                          (bid    (bid learner observation)))
+                     (if (eq (action-type action) :atomic)
+                         (accumulate-bid action bid)
+                         ;; Recurse into sub-team to get marginalized distribution
+                         (multiple-value-bind (sub-actions sub-probs)
+                             (marginalize-team (action-action action))
+                           (loop for sub-act in sub-actions
+                                 for sub-p in sub-probs
+                                 do (accumulate-bid sub-act (* bid sub-p)))))))
+
+                 ;; 2. Sort alphanumerically and compute softmax distribution
+                 (let* ((sorted-bids (sort (copy-list bid-alist)
+                                           #'string<
+                                           :key (lambda (pair) (princ-to-string (car pair)))))
+                        (actions     (mapcar #'car sorted-bids))
+                        (logits      (mapcar #'cdr sorted-bids))
+                        (probs       (softmax logits)))
+                   (values actions probs)))))
+
+           (sample-action (actions probs)
+             (let ((r (random 1.0))
+                   (cum 0.0))
+               (loop for act in actions
+                     for p in probs
+                     do (incf cum p)
+                     when (<= r cum)
+                       return act
+                     finally (return (car (last actions)))))))
+
+    ;; Marginalize starting from root team, sample, and return (values action distribution)
+    (multiple-value-bind (actions probs)
+        (marginalize-team team)
+      (let* ((selected-action (sample-action actions probs))
+             (numeric-action  (action-action selected-action)))
+        (values numeric-action probs)))))
 
 (defun execute-team-on-dataset (team dataset)
   "Batch executes a team across all the observations in DATASET."
@@ -124,3 +183,12 @@
     (let ((action (learner-action learner)))
       (when (eq (action-type action) :reference)
 	(delete-reference (action-action action))))))
+
+(defun team-depth (team)
+  "Recursively find the longest path from TEAM to an atomic action."
+  (let ((max-child 0))
+    (dolist (learner (team-learners team))
+      (let ((act (learner-action learner)))
+        (when (eq (action-type act) :reference)
+          (setf max-child (max max-child (1+ (team-depth (action-action act))))))))
+    max-child))

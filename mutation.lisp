@@ -71,7 +71,7 @@
     (let* ((instructions (program-instructions program))
 	   (instructions-with-constants
 	     (remove-if-not #'instruction-has-constant-p instructions)))
-      (when instructions-with-constants
+      (when (> (length instructions-with-constants) 0)
 	(let* ((instr (random-choice instructions-with-constants))
 	       (slots (remove nil
 			      (list (when (eq (instruction-src1-type instr) :const)
@@ -179,7 +179,9 @@
 	 (setf (action-action action) (random *num-actions*))))
       (:reference
        (let ((target (random-choice (remove team *teams* :test #'equal))))
-	 (if (creates-cycle-p team target)
+	 (if (or (null target)
+	         (creates-cycle-p team target)
+		 (> (1+ (team-depth target)) *max-depth*))
 	     ;; Cycle detected, fallback to an atomic action.
 	     (progn
 	       (setf (action-type action) :atomic)

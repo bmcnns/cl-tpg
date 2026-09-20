@@ -1,16 +1,13 @@
 (in-package :bes-gym)
 
 (defun obs->array (obs)
-  "Coerces an observation OBS from list to simple double-float array.
-   Our TPG implementation assumes double-float arrays for maximum performance.
-   Py4CL sends the observations as lists."
-  (if (listp obs)
+  (if (typep obs 'sequence)
       (map '(simple-array double-float (*))
-	   (lambda (x) (coerce x 'double-float))
-	   obs)
-      (map '(simple-array double-float (*))
-	   (lambda (x) (coerce x 'double-float))
-	   (list obs))))
+           (lambda (x) (coerce x 'double-float))
+           obs)
+      (make-array 1
+                  :element-type 'double-float
+                  :initial-element (coerce obs 'double-float))))
 
 (defun make (environment-name &rest make-kwargs &key (video-path nil) &allow-other-keys)
   "Makes a new Gymnasium environment. If you are using a custom Gymnasium environment,
@@ -69,12 +66,43 @@
 		  (probe-file "rl-video-episode-0.mp4"))
 	 (rename-file "rl-video-episode-0.mp4" video-path))))
     (values episode-reward states)))
-       
-		  
-		  
-    
-	 
-  
+
+(defun entropy-regularized-rollout (root-team environment-name seed &rest rollout-kwargs
+				    &key (video-path nil) &allow-other-keys)
+  (py4cl2:pyexec "import gymnasium as gym")
+  (let* ((filtered-kwargs (alexandria:remove-from-plist rollout-kwargs :video-path))
+	 (env (apply #'make environment-name :video-path video-path filtered-kwargs))
+	 (episode-reward 0.0)
+	 (observation (reset env seed))
+	 (entropies '())
+	 (states '()))
+    (unwind-protect
+	 (loop for timestep from 0
+	       do (multiple-value-bind (action dist)
+		      (bes:execute-team root-team observation)
+		    (multiple-value-bind (obs rew term trunc info)
+			(step env action)
+		      (declare (ignore info))
+		      (incf episode-reward rew)
+		      (setf observation obs)
+		      (push (bes:entropy dist) entropies)
+		      (push obs states)
+		      (when (or term trunc)
+			(return)))))
+      (ignore-errors
+       (py4cl2:pymethod env "close")
+       (when (and video-path
+		  (probe-file "rl-video-episode-0.mp4"))
+	 (rename-file "rl-video-episode-0.mp4" video-path))))
+    (let ((entropy-bonus (* bes:*beta* (/ (reduce #'+ entropies) (length entropies)))))
+      (values (+ episode-reward entropy-bonus) states))))
+
+
+
+
+
+
+
 
 
 

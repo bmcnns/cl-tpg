@@ -101,3 +101,9 @@
 
 (defparameter *batch-size* 1000
   "The number of generations to wait between sending migrants.")
+
+(defparameter *beta* 0.1
+  "The weight of the entropy-regularization term.")
+
+(defparameter *max-depth* 5
+  "The maximum allowed depth of a root-team.")
