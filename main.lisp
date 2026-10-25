@@ -84,10 +84,23 @@
           (division-by-zero () :bad)
           (error () :bad))))
 
+(defun parallel-safe-evaluate-team (team)
+  "SAFE-EVALUATE-TEAM for a worker thread. Random draws (e.g. sampling a
+   stochastic policy's action) use a private copy of *random-state*, so
+   workers never advance the shared state concurrently."
+  (let ((*random-state* (make-random-state *random-state*)))
+    (safe-evaluate-team team)))
+
 (defun evaluate ()
-  "Returns a list of (team . fitness), skipping and deleting bad teams."
-  (let* ((results (mapcar #'safe-evaluate-team
-                                     (root-teams)))
+  "Returns a list of (team . fitness), skipping and deleting bad teams.
+   Teams are evaluated in parallel when run-search has started a kernel."
+  (let* ((teams (root-teams))
+	 (results (if *kernel*
+		      ;; One task per team so faster cores pick up more of the work.
+		      (lparallel:pmapcar #'parallel-safe-evaluate-team
+					 :parts (max 1 (length teams))
+					 teams)
+		      (mapcar #'safe-evaluate-team teams)))
          (bad-teams (loop for (team . fitness) in results
                           when (eq fitness :bad)
                             collect team))
@@ -178,9 +191,16 @@
       (:online (apply #'make-fitness-function :gym-environment-name gym-environment-name kwargs))
       (:offline (make-fitness-function :dataset-name dataset-name)))
 
-    (loop while (<= *generation* generations)
-	  do (evolve)
-	  do (incf *generation*))))
+    ;; Offline evaluation runs on *num-threads* workers. Online stays serial:
+    ;; py4cl talks to a single Python process.
+    (let ((*kernel* (when (and (eq mode :offline) (> *num-threads* 1))
+		      (make-kernel *num-threads* :name "bes-evaluate"))))
+      (unwind-protect
+	   (loop while (<= *generation* generations)
+		 do (evolve)
+		 do (incf *generation*))
+	(when *kernel*
+	  (end-kernel :wait t))))))
 		   
 (defun best-policy ()
   "Returns the individual in *teams* with the highest fitness."
