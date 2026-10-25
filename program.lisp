@@ -96,6 +96,9 @@
     (format stream "~%~{ ~A~%~}" (pprint-program p))))
 
 (defun clone-program (program)
-  "Deep-copies a program."
-  (make-program
-   :instructions (alexandria:copy-array (program-instructions program))))
+  "Deep-copies a program. Instructions are vectors that mutate-constant edits
+   in place, so each one is copied too; otherwise a clone's mutations would
+   rewrite the parent's program."
+  (let ((instructions (alexandria:copy-array (program-instructions program))))
+    (make-program
+     :instructions (map-into instructions #'copy-seq instructions))))
