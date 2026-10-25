@@ -155,6 +155,8 @@
 
     (format t "Trial ~5A Generation ~5A Fitness ~,8F~%" *trial* *generation* (cdr best-score))
 
+    (setf *champion* (car best-score))
+
     (select evaluation-scores)
     
     (reproduce)))
@@ -166,6 +168,7 @@
     (setf *random-state* captured-state)
 
     (setf *teams* nil)
+    (setf *champion* nil)
     (setf *generation* 1)
     
     ;; make the initial population

@@ -178,7 +178,11 @@
 	 (setf (action-type action) :atomic)
 	 (setf (action-action action) (random *num-actions*))))
       (:reference
-       (let ((target (random-choice (remove team *teams* :test #'equal))))
+       (let ((target (random-choice
+		      (let ((candidates (remove team *teams* :test #'equal)))
+			(if *champion*
+			    (remove *champion* candidates :test #'eq)
+			    candidates)))))
 	 (if (or (null target)
 	         (creates-cycle-p team target)
 		 (> (1+ (team-depth target)) *max-depth*))
