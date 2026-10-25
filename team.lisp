@@ -82,55 +82,71 @@
      1. The numeric action (action-action) sampled from the final distribution.
      2. The list of sorted probabilities (distribution)."
   (labels ((marginalize-team (current-team)
-             (let ((bid-alist '()))
-               (labels ((accumulate-bid (act weight)
-                          (let ((cell (assoc act bid-alist :test #'equalp)))
-                            (if cell
-                                (incf (cdr cell) weight)
-                                (push (cons act weight) bid-alist)))))
-                 
-                 ;; 1. Accumulate bids from learners
-                 (dolist (learner (team-learners current-team))
-                   (let* ((action (learner-action learner))
-                          (bid    (bid learner observation)))
-                     (if (eq (action-type action) :atomic)
-                         (accumulate-bid action bid)
-                         ;; Recurse into sub-team to get marginalized distribution
-                         (multiple-value-bind (sub-actions sub-probs)
-                             (marginalize-team (action-action action))
-                           (loop for sub-act in sub-actions
-                                 for sub-p in sub-probs
-                                 do (accumulate-bid sub-act (* bid sub-p)))))))
+	     (let ((bid-alist '()))
+	       (labels ((accumulate-bid (act weight)
+			  (let ((cell (assoc act bid-alist :test #'equalp)))
+			    (if cell
+				(incf (cdr cell) weight)
+				(push (cons act weight) bid-alist)))))
+		 
+		 ;; 1. Accumulate bids from learners
+		 (dolist (learner (team-learners current-team))
+		   (let* ((action (learner-action learner))
+			  (bid    (bid learner observation)))
+		     (if (eq (action-type action) :atomic)
+			 ;; Atomic action
+			 (accumulate-bid (action-action action) bid)
+			 ;; Team pointer, recurse to get marginalized action distribution.
+			 (let ((sub-probs
+				 (marginalize-team
+				  (action-action action))))
+			   (loop for action-number from 0 below *num-actions*
+				 for sub-p in sub-probs
+				 when (> sub-p 0.0)
+				   do (accumulate-bid
+				       action-number
+				       (* bid sub-p)))))))
 
-                 ;; 2. Sort alphanumerically and compute softmax distribution
-                 (let* ((sorted-bids (sort (copy-list bid-alist)
-                                           #'string<
-                                           :key (lambda (pair) (princ-to-string (car pair)))))
-                        (actions     (mapcar #'car sorted-bids))
-                        (logits      (mapcar #'cdr sorted-bids))
-                        (probs       (softmax logits)))
-                   (values actions probs)))))
+		 ;; Softmax only actions actually represented
+		 (let* ((action-numbers (mapcar #'car bid-alist))
+			(logits (mapcar #'cdr bid-alist))
+			(probs (softmax logits))
+			(distribution
+			  (make-list *num-actions*
+				     :initial-element 0.0)))
 
-           (sample-action (actions probs)
+		   (loop for action-number in action-numbers
+			 for prob in probs
+			 do (setf (nth action-number distribution)
+				  prob))
+
+		   distribution))))
+
+           (sample-action (probs)
              (let ((r (random 1.0))
                    (cum 0.0))
-               (loop for act in actions
+               (loop for action-number from 0
                      for p in probs
                      do (incf cum p)
                      when (<= r cum)
-                       return act
-                     finally (return (car (last actions)))))))
+                       return action-number
+                     finally (return (1- *num-actions*))))))
 
-    ;; Marginalize starting from root team, sample, and return (values action distribution)
-    (multiple-value-bind (actions probs)
-        (marginalize-team team)
-      (let* ((selected-action (sample-action actions probs))
-             (numeric-action  (action-action selected-action)))
-        (values numeric-action probs)))))
+    ;; Marginalize starting from root team, sample, and return action distribution)
+    (let* ((probs (marginalize-team team))
+	   (selected-action (sample-action probs)))
+      (values selected-action probs))))
 
 (defun execute-team-on-dataset (team dataset)
   "Batch executes a team across all the observations in DATASET."
-  (map 'list (lambda (obs) (execute-team team obs)) (observations dataset)))
+  (if *stochastic*
+      (map 'list (lambda (obs)
+		   (multiple-value-bind (action logits)
+		       (stochastic-execute-team team obs)
+		     (declare (ignore action))
+		     logits))
+	   (observations dataset))
+      (map 'list (lambda (obs) (execute-team team obs)) (observations dataset))))
 
 (defmethod print-object ((tm team) stream)
   "Updates the default printer to pretty print teams by showing

@@ -12,6 +12,7 @@
 	       (:file "action")
 	       (:file "learner")
 	       (:file "team")
+	       (:file "storage")
 	       (:file "mutation")
 	       (:file "dataset")
 	       (:file "migration")

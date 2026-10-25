@@ -74,6 +74,9 @@
                                     (declare (type double-float q))
                                     (the double-float (- arg1 (the double-float (* q arg2)))))))
                         (:MAX (max arg1 arg2))
+			(:NEG-IF-LESS (if (< arg1 arg2)
+					  (- arg1)
+					  arg1))
                         (t 0.0d0))))))
           (declare (type double-float result))
           (when (> result 1.0d3)
@@ -93,6 +96,9 @@
     (format stream "~%~{ ~A~%~}" (pprint-program p))))
 
 (defun clone-program (program)
-  "Deep-copies a program."
-  (make-program
-   :instructions (alexandria:copy-array (program-instructions program))))
+  "Deep-copies a program. Instructions are vectors that mutate-constant edits
+   in place, so each one is copied too; otherwise a clone's mutations would
+   rewrite the parent's program."
+  (let ((instructions (alexandria:copy-array (program-instructions program))))
+    (make-program
+     :instructions (map-into instructions #'copy-seq instructions))))

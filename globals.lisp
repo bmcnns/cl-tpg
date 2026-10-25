@@ -105,5 +105,8 @@
 (defparameter *beta* 0.1
   "The weight of the entropy-regularization term.")
 
+(defvar *champion* nil
+  "The best root team of the most recent generation.")
+
 (defparameter *max-depth* 5
   "The maximum allowed depth of a root-team.")
