@@ -6,6 +6,7 @@
 			  #:pmap
 			  #:end-kernel)
 	    (:export :start-server :stop-server :execute-team :run-search
+		     :store-team :load-team
 		     #:*num-threads*
 		     #:*population-size*
 		     #:*num-observations*
@@ -29,6 +30,8 @@
 		     #:*fitness-file*
 		     #:*cdf-file*
 		     #:*state-visitation-file*
+		     #:*champion-file*
+		     #:*exploitability-file*
 		     #:*video-file*
 		     
 		     #:*trial*
@@ -39,7 +42,6 @@
 		     #:*entropy-regularized*
 		     #:*beta*
 		     #:*monte-carlo-rollouts*
-
 		     #:init-success-accumulator
 		     #:write-success-curve
 		     #:*max-depth*))

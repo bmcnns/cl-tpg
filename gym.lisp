@@ -1,13 +1,29 @@
 (in-package :bes-gym)
 
 (defun obs->array (obs)
-  (if (typep obs 'sequence)
-      (map '(simple-array double-float (*))
-           (lambda (x) (coerce x 'double-float))
-           obs)
-      (make-array 1
-                  :element-type 'double-float
-                  :initial-element (coerce obs 'double-float))))
+  (labels ((flatten-rgb (array)
+             (let ((result
+                     (make-array (array-total-size array)
+                                 :element-type 'double-float)))
+               (dotimes (i (array-total-size array) result)
+                 (setf (aref result i)
+                       (coerce (row-major-aref array i)
+                               'double-float))))))
+    (cond
+      ((hash-table-p obs)
+       (flatten-rgb (gethash "image" obs)))
+
+      ((typep obs 'sequence)
+       (map '(simple-array double-float (*))
+            (lambda (x)
+              (coerce x 'double-float))
+            obs))
+
+      (t
+       (make-array 1
+                   :element-type 'double-float
+                   :initial-element
+                   (coerce obs 'double-float))))))
 
 (defun make (environment-name &rest make-kwargs &key (video-path nil) &allow-other-keys)
   "Makes a new Gymnasium environment. If you are using a custom Gymnasium environment,
@@ -43,6 +59,7 @@
   "Runs a complete episode against a Gymnasium environment with name ENVIRONMENT-NAME
    using ROOT-TEAM as the policy. Specify a SEED to control for the starting state.
    Specify a filename for video-path if you want to record a video of the agent."
+  (py4cl2:pyexec "import minigrid")
   (py4cl2:pyexec "import gymnasium as gym")
   (let* ((filtered-kwargs (alexandria:remove-from-plist rollout-kwargs :video-path))
 	 (env (apply #'make environment-name :video-path video-path filtered-kwargs))
@@ -69,6 +86,7 @@
 
 (defun entropy-regularized-rollout (root-team environment-name seed &rest rollout-kwargs
 				    &key (video-path nil) &allow-other-keys)
+  (py4cl2:pyexec "import minigrid")
   (py4cl2:pyexec "import gymnasium as gym")
   (let* ((filtered-kwargs (alexandria:remove-from-plist rollout-kwargs :video-path))
 	 (env (apply #'make environment-name :video-path video-path filtered-kwargs))

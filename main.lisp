@@ -5,6 +5,8 @@
 (defvar *cdf-file*)
 (defvar *state-visitation-file*)
 (defvar *video-file*)
+(defvar *exploitability-file*)
+(defvar *champion-file*)
 
 (defvar *stochastic*)
 (defvar *entropy-regularized*)
@@ -28,6 +30,14 @@
     (/ (loop for actual across actuals
 	  for predicted in predictions
 	     count (= actual predicted))
+       (length actuals))))
+
+(defun log-likelihood (team dataset)
+  (let ((predictions (execute-team-on-dataset team dataset))
+        (actuals (actions dataset)))
+    (/ (loop for probabilities in predictions
+             for action across actuals
+	     sum (log (max 1d-12 (nth action probabilities))))
        (length actuals))))
 
 (defun make-fitness-function (&rest kwargs &key gym-environment-name dataset-name &allow-other-keys)
@@ -58,9 +68,12 @@
                     (length current-gen-seeds))))))
       (dataset-name
        (let ((dataset (load-dataset dataset-name)))
-         (setf *fitness-fn* 
-               (lambda (team)
-                 (accuracy team dataset))))))))
+         (setf *fitness-fn*
+	       (if *stochastic*
+		   (lambda (team)
+		     (log-likelihood team dataset))
+		   (lambda (team)
+		     (accuracy team dataset)))))))))
 
 (defun safe-evaluate-team (team)
   (cons team
@@ -126,61 +139,25 @@
   (loop while (< (length (root-teams)) *population-size*)
 	do (mutate-team (clone-team (random-choice (root-teams))))))
 
-(defvar *gen-total-successes* nil)
-(defvar *gen-total-rollouts* nil)
-
-(defun init-success-accumulator (num-generations)
-  (setf *gen-total-successes* (make-array (1+ num-generations)
-				       :element-type 'double-float
-				       :initial-element 0.0d0))
-  (setf *gen-total-rollouts* (make-array (1+ num-generations)
-					 :element-type 'fixnum
-					 :initial-element 0)))
-
-
 (defun evolve ()
   "Evolve the population for a single generation."
  ; (receive-migrants)
 
   (let* ((evaluation-scores (evaluate))
-	 (best-score (alexandria:extremum evaluation-scores #'> :key #'cdr))
-	 (successes
-	   (* (floor (/ (cdr best-score) 0.2d0))
-	      0.2d0
-	      *monte-carlo-rollouts*)))
-
-    (incf (aref *gen-total-successes* *generation*) successes)
-    (incf (aref *gen-total-rollouts* *generation*) *monte-carlo-rollouts*)
-    
+	 (best-score (alexandria:extremum evaluation-scores #'> :key #'cdr)))
     (with-open-file (str *fitness-file*
 			 :direction :output
 			 :if-does-not-exist :create
 			 :if-exists :append)
       (when (zerop (file-length str))
 	(format str "TRIAL GENERATION FITNESS~%"))
-      (format str "~A ~A ~A~%" *trial* *generation* (cdr best-score))
-      (format t "Trial ~5A Generation ~5A Fitness ~5A~%" *trial* *generation* (cdr best-score)))
+      (format str "~A ~A ~,8F~%" *trial* *generation* (cdr best-score)))
 
-    ;; (when (should-send-migrants-p)
-    ;;   (send-migrants evaluation-scores))
+    (format t "Trial ~5A Generation ~5A Fitness ~,8F~%" *trial* *generation* (cdr best-score))
 
     (select evaluation-scores)
     
     (reproduce)))
-
-(defun write-success-curve ()
-  "Writes the pooled empirical solve probability per generation."
-  (with-open-file (stream *cdf-file*
-			  :direction :output
-			  :if-exists :supersede
-			  :if-does-not-exist :create)
-    (format stream "GENERATION MEAN_SUCCESS_RATE~%")
-    (loop for g from 1 below (length *gen-total-rollouts*)
-	  for total-r = (aref *gen-total-rollouts* g)
-	  for total-s = (aref *gen-total-successes* g)
-	  for rate = (if (plusp total-r) (/ total-s total-r 1.0d0) 0.0d0)
-	  do (format stream "~D ~,9F~%" g rate))))
-    
 
 (defun run-search (mode gym-environment-name dataset-name seed generations &rest kwargs)
   "Search the solution space with a tangled program graph."

@@ -28,7 +28,7 @@
 (defun opcode-arity (opcode)
   "Returns the arity of a given OPCODE."
   (ecase opcode
-    ((:ADD :SUB :MUL :DIV :MOD :MAX) 2)
+    ((:ADD :SUB :MUL :DIV :MOD :MAX :NEG-IF-LESS) 2)
     ((:SIN :COS :TAN :EXP :LOG) 1)))
 
 (defun decode-symbol (sym)
@@ -49,7 +49,7 @@
             (:constructor make-instruction
              (&aux
               ;; 1. Generate the opcode and arity
-              (op (random-choice '(:ADD :SUB :MUL :DIV :MAX :EXP :LOG :SIN :COS :TAN :MOD)))
+              (op (random-choice '(:ADD :SUB :MUL :DIV :MAX :EXP :LOG :SIN :COS :TAN :MOD :NEG-IF-LESS)))
               (arity (opcode-arity op))
               ;; 2. Generate destination index directly
               (dest (truncate (nth-value 1 (decode-symbol (random-register)))))

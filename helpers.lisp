@@ -102,3 +102,22 @@
 	 (exp-vals (mapcar (lambda (x) (exp (- x max-val))) seq))
 	 (sum-exp (reduce #'+ exp-vals)))
     (mapcar (lambda (x) (/ x sum-exp)) exp-vals)))
+
+(defun exploitability (probabilities)
+  (destructuring-bind (rock paper scissors) probabilities
+    (max (- scissors paper)
+	 (- rock scissors)
+	 (- paper rock))))
+
+(defun mean-exploitability (team dataset)
+  (let* ((probabilities
+	   (if *stochastic*
+	       (execute-team-on-dataset team dataset)
+	       (mapcar (lambda (action)
+			 (case action
+			   (0 '(1.0 0.0 0.0))
+			   (1 '(0.0 1.0 0.0))
+			   (2 '(0.0 0.0 1.0))))
+		       (execute-team-on-dataset team dataset))))
+	 (exploitability (mapcar #'exploitability probabilities)))
+    (/ (reduce #'+ exploitability) (length (observations dataset)))))
